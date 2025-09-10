@@ -9,6 +9,86 @@ DRIVER_LIST_URL = reverse("taxi:driver-list")
 CAR_LIST_URL = reverse("taxi:car-list")
 
 
+class ModuleListViewSearchTest(TestCase):
+    def setUp(self):
+        self.driver = get_user_model().objects.create_user(
+            username="driver",
+            password="<PASSWORD123>",
+            license_number="ASD54321",
+        )
+        self.driver_one = Driver.objects.create(
+            username="testdriver", license_number="ASD54381")
+        self.driver_two = Driver.objects.create(
+            username="driver_two", license_number="ASD54391")
+        self.driver_three = Driver.objects.create(
+            username="another_driver", license_number="ASD54101")
+        self.manufacturer_one = Manufacturer.objects.create(
+            name="manufacturertest", country="USC")
+        self.manufacturer_two = Manufacturer.objects.create(
+            name="two_manufacturer", country="USP")
+        self.manufacturer_three = Manufacturer.objects.create(
+            name="manufacturer_another", country="USB")
+        self.car_one = Car(
+            model="Toyota", manufacturer=self.manufacturer_one, id=1)
+        self.car_two = Car(
+            model="Another_Toyota", manufacturer=self.manufacturer_two, id=2)
+        self.car_three = Car(
+            model="testToyota", manufacturer=self.manufacturer_three, id=3)
+        self.car_one.drivers.add(self.driver_one)
+        self.car_one.drivers.add(self.driver_two)
+        self.car_one.save()
+        self.car_two.drivers.add(self.driver_one)
+        self.car_two.drivers.add(self.driver_three)
+        self.car_two.save()
+        self.car_three.drivers.add(self.driver_three)
+        self.car_three.drivers.add(self.driver_two)
+        self.car_three.save()
+
+    def test_search_cars_group_correct_model(self):
+        self.client.login(username="driver", password="<PASSWORD123>")
+        response = self.client.get(CAR_LIST_URL, {"model": "toyota"})
+        self.assertContains(response, "Toyota")
+        self.assertContains(response, "Another_Toyota")
+        self.assertContains(response, "testToyota")
+        self.assertEqual(len(response.context["car_list"]), 3)
+
+    def test_search_car_correct_model(self):
+        self.client.login(username="driver", password="<PASSWORD123>")
+        response = self.client.get(CAR_LIST_URL, {"model": "another"})
+        self.assertContains(response, "Another_Toyota")
+        self.assertEqual(len(response.context["car_list"]), 1)
+
+    def test_search_manufacturer_correct_name(self):
+        self.client.login(username="driver", password="<PASSWORD123>")
+        response = self.client.get(MANUFACTURER_LIST_URL, {"name": "test"})
+        self.assertContains(response, self.manufacturer_one.name)
+        self.assertEqual(len(response.context["manufacturer_list"]), 1)
+
+    def test_search_manufacturers_group_correct_name(self):
+        self.client.login(username="driver", password="<PASSWORD123>")
+        response = (self.client.
+                    get(MANUFACTURER_LIST_URL, {"name": "manufacturer"}))
+        self.assertContains(response, self.manufacturer_one.name)
+        self.assertContains(response, self.manufacturer_two.name)
+        self.assertContains(response, self.manufacturer_three.name)
+        self.assertEqual(len(response.context["manufacturer_list"]), 3)
+
+    def test_search_driver_correct_username(self):
+        self.client.login(username="driver", password="<PASSWORD123>")
+        response = self.client.get(DRIVER_LIST_URL, {"username": "testdriver"})
+        self.assertContains(response, self.driver_one.username)
+        self.assertEqual(len(response.context["driver_list"]), 1)
+
+    def test_search_drivers_group_correct_username(self):
+        self.client.login(username="driver", password="<PASSWORD123>")
+        response = self.client.get(DRIVER_LIST_URL, {"username": "driver"})
+        self.assertContains(response, self.driver_one.username)
+        self.assertContains(response, self.driver_two.username)
+        self.assertContains(response, self.driver_three.username)
+        self.assertContains(response, self.driver.username)
+        self.assertEqual(len(response.context["driver_list"]), 4)
+
+
 class PublicManufacturerTest(TestCase):
     def test_login_required(self):
         res = self.client.get(MANUFACTURER_LIST_URL)
